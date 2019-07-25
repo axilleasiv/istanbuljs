@@ -25,7 +25,8 @@ class VisitState {
         types,
         sourceFilePath,
         inputSourceMap,
-        ignoreClassMethods = []
+        ignoreClassMethods = [],
+        cvIncreaseCb
     ) {
         this.varName = genVar(sourceFilePath);
         this.attrs = {};
@@ -36,6 +37,7 @@ class VisitState {
             this.cov.inputSourceMap(inputSourceMap);
         }
         this.ignoreClassMethods = ignoreClassMethods;
+        this.cvIncreaseCb = cvIncreaseCb;
         this.types = types;
         this.sourceMappingURL = null;
     }
@@ -162,24 +164,39 @@ class VisitState {
     //
     increase(type, id, index) {
         const T = this.types;
-        const wrap =
-            index !== null
-                ? // If `index` present, turn `x` into `x[index]`.
-                  x => T.memberExpression(x, T.numericLiteral(index), true)
-                : x => x;
-        return T.updateExpression(
-            '++',
-            wrap(
+
+        if (this.cvIncreaseCb) {
+            let args = [T.stringLiteral(type), T.numericLiteral(id)];
+
+            if (index !== null) {
+                args.push(T.numericLiteral(index));
+            }
+            return T.callExpression(
                 T.memberExpression(
+                    T.identifier(this.varName),
+                    T.identifier('inc')
+                ),
+                args
+            );
+        } else {
+            const wrap =
+                index !== null // If `index` present, turn `x` into `x[index]`.
+                    ? x => T.memberExpression(x, T.numericLiteral(index), true)
+                    : x => x;
+            return T.updateExpression(
+                '++',
+                wrap(
                     T.memberExpression(
-                        T.identifier(this.varName),
-                        T.identifier(type)
-                    ),
-                    T.numericLiteral(id),
-                    true
+                        T.memberExpression(
+                            T.identifier(this.varName),
+                            T.identifier(type)
+                        ),
+                        T.numericLiteral(id),
+                        true
+                    )
                 )
-            )
-        );
+            );
+        }
     }
 
     insertCounter(path, increment) {
@@ -603,7 +620,8 @@ function programVisitor(
         types,
         sourceFilePath,
         opts.inputSourceMap,
-        opts.ignoreClassMethods
+        opts.ignoreClassMethods,
+        opts.cvIncreaseCb
     );
     return {
         enter(path) {
@@ -633,6 +651,24 @@ function programVisitor(
                 .digest('hex');
             coverageData.hash = hash;
             const coverageNode = T.valueToNode(coverageData);
+
+            if (opts.cvIncreaseCb) {
+                const inCreaseCbTemplate = template.ast(opts.cvIncreaseCb);
+
+                coverageNode.properties.push(
+                    T.ObjectMethod(
+                        'method',
+                        T.identifier('inc'),
+                        [
+                            T.identifier('type'),
+                            T.identifier('id'),
+                            T.identifier('index')
+                        ],
+                        T.BlockStatement(inCreaseCbTemplate)
+                    )
+                );
+            }
+
             delete coverageData[MAGIC_KEY];
             delete coverageData.hash;
             let gvTemplate;
