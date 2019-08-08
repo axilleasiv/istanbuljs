@@ -623,6 +623,17 @@ function programVisitor(
         opts.ignoreClassMethods,
         opts.cvIncreaseCb
     );
+
+    let cvTemplate;
+    let cvNode;
+
+    if (opts.cvIncreaseCb) {
+        cvTemplate = template(opts.cvIncreaseCb);
+        cvNode = cvTemplate({
+            REL: T.stringLiteral(sourceFilePath)
+        });
+    }
+
     return {
         enter(path) {
             if (shouldIgnoreFile(path.find(p => p.isProgram()))) {
@@ -653,8 +664,6 @@ function programVisitor(
             const coverageNode = T.valueToNode(coverageData);
 
             if (opts.cvIncreaseCb) {
-                const inCreaseCbTemplate = template.ast(opts.cvIncreaseCb);
-
                 coverageNode.properties.push(
                     T.ObjectMethod(
                         'method',
@@ -664,7 +673,7 @@ function programVisitor(
                             T.identifier('id'),
                             T.identifier('index')
                         ],
-                        T.BlockStatement(inCreaseCbTemplate)
+                        T.BlockStatement(cvNode)
                     )
                 );
             }
