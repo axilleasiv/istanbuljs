@@ -557,10 +557,10 @@ const coverageTemplate = template(`
         var gcv = GLOBAL_COVERAGE_VAR;
         var coverageData = INITIAL;
         var coverage = global[gcv] || (global[gcv] = {});
-        if (coverage[path] && coverage[path].hash === hash) {
-            return coverage[path];
+        if (coverage.data[path] && coverage.data[path].hash === hash) {
+            return coverage.data[path];
         }
-        return coverage[path] = coverageData;
+        return coverage.data[path] = coverageData;
     })();
 `);
 // the rewire plugin (and potentially other babel middleware)
